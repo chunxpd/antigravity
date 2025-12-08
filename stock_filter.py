@@ -30,7 +30,7 @@ def fetch_worker(ticker, start_date, queue):
     except Exception:
         queue.put(pd.DataFrame())
 
-def fetch_data_with_timeout(ticker, start_date, timeout=10):
+def fetch_data_with_timeout(ticker, start_date, timeout=30):
     """
     multiprocessing을 사용하여 타임아웃을 강제합니다.
     """
@@ -113,7 +113,7 @@ def get_stock_data(ticker, name, start_date, update=False):
             return df
         else:
             # 신규 다운로드 (타임아웃 적용)
-            df = fetch_data_with_timeout(ticker, start_date, timeout=10)
+            df = fetch_data_with_timeout(ticker, start_date, timeout=30)
             if not df.empty:
                 try:
                     df.to_csv(file_path)
@@ -123,7 +123,7 @@ def get_stock_data(ticker, name, start_date, update=False):
     except Exception as e:
         # 오류 발생 시 다시 다운로드 시도
         try:
-            df = fetch_data_with_timeout(ticker, start_date, timeout=10)
+            df = fetch_data_with_timeout(ticker, start_date, timeout=30)
             if not df.empty:
                 df.to_csv(file_path)
             return df

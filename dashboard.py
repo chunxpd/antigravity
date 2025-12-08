@@ -14,7 +14,7 @@ st.title("📈 이동평균선 돌파 종목 분석 made by Genius.")
 
 # 사이드바 설정
 st.sidebar.header("설정")
-window_size = st.sidebar.number_input("이동평균선 기간 (일)", min_value=5, max_value=500, value=300, step=10)
+window_size = st.sidebar.number_input("이동평균선 기간 (일)", min_value=5, max_value=3000, value=300, step=10)
 update_data = st.sidebar.checkbox("최신 데이터 업데이트 (속도 느림)", value=False, help="체크하면 모든 종목의 최신 데이터를 다시 받아옵니다. 체크 해제 시 저장된 데이터를 사용하여 빠르게 분석합니다.")
 
 # 분석 실행 버튼
