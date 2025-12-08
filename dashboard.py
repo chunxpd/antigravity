@@ -254,6 +254,17 @@ else:
                     line=dict(color='orange', width=2),
                     name=f'{window_size}일 이동평균선'
                 ))
+
+                # N일 전 주가 (비교용)
+                if compare_days > 0:
+                     shifted_col = f'Close_{compare_days}d_ago'
+                     df_chart[shifted_col] = df_chart['Close'].shift(compare_days)
+                     fig.add_trace(go.Scatter(
+                        x=df_chart.index,
+                        y=df_chart[shifted_col],
+                        line=dict(color='cyan', width=1, dash='dot'),
+                        name=f'{compare_days}일 전 주가'
+                    ))
                 
                 fig.update_layout(
                     height=600,
