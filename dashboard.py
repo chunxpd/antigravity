@@ -230,7 +230,15 @@ else:
             # 이름도 함께 전달
             df_chart = load_stock_data(ticker, name, window_size)
             
+
+
             if not df_chart.empty:
+                # N일 전 주가 (비교용) - tail 자르기 전에 미리 계산해야 함
+                shifted_col = None
+                if compare_days > 0:
+                     shifted_col = f'Close_{compare_days}d_ago'
+                     df_chart[shifted_col] = df_chart['Close'].shift(compare_days)
+
                 # 최근 400일 데이터만 표시 (혹은 window에 비례해서)
                 display_days = max(400, window_size + 100)
                 df_chart = df_chart.tail(display_days)
@@ -256,9 +264,7 @@ else:
                 ))
 
                 # N일 전 주가 (비교용)
-                if compare_days > 0:
-                     shifted_col = f'Close_{compare_days}d_ago'
-                     df_chart[shifted_col] = df_chart['Close'].shift(compare_days)
+                if shifted_col and shifted_col in df_chart.columns:
                      fig.add_trace(go.Scatter(
                         x=df_chart.index,
                         y=df_chart[shifted_col],
