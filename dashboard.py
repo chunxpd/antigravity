@@ -25,7 +25,8 @@ if st.sidebar.button("분석 시작 (데이터 갱신)"):
     with st.spinner(f"{window_size}일 이동평균선 기준으로 분석 중입니다... (시간이 다소 소요됩니다)"):
         try:
             # 명령어 구성
-            cmd = ["python", "stock_filter.py", "--window", str(window_size)]
+            import sys
+            cmd = [sys.executable, "stock_filter.py", "--window", str(window_size)]
             if update_data:
                 cmd.append("--update")
 
