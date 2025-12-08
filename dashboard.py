@@ -212,10 +212,10 @@ else:
         st.dataframe(
             df_stocks,
             column_config={
-                "Close": st.column_config.NumberColumn("Close", format="%d"),
-                f"MA{window_size}": st.column_config.NumberColumn(f"MA{window_size}", format="%d"),
-                "Prev_Close": st.column_config.NumberColumn("Prev_Close", format="%d"),
-                f"Prev_MA{window_size}": st.column_config.NumberColumn(f"Prev_MA{window_size}", format="%d"),
+                "Close": st.column_config.NumberColumn("Close", format="localized"),
+                f"MA{window_size}": st.column_config.NumberColumn(f"MA{window_size}", format="localized"),
+                "Prev_Close": st.column_config.NumberColumn("Prev_Close", format="localized"),
+                f"Prev_MA{window_size}": st.column_config.NumberColumn(f"Prev_MA{window_size}", format="localized"),
                 "Ratio": st.column_config.NumberColumn("Ratio", format="%.2f%%"),
             },
             hide_index=True
