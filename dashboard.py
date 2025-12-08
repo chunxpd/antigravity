@@ -207,4 +207,16 @@ else:
 
         # 데이터 테이블 표시
         st.subheader("전체 필터링 결과")
-        st.dataframe(df_stocks)
+        
+        # 숫자 포맷 설정
+        st.dataframe(
+            df_stocks,
+            column_config={
+                "Close": st.column_config.NumberColumn("Close", format="%d"),
+                f"MA{window_size}": st.column_config.NumberColumn(f"MA{window_size}", format="%d"),
+                "Prev_Close": st.column_config.NumberColumn("Prev_Close", format="%d"),
+                f"Prev_MA{window_size}": st.column_config.NumberColumn(f"Prev_MA{window_size}", format="%d"),
+                "Ratio": st.column_config.NumberColumn("Ratio", format="%.2f%%"),
+            },
+            hide_index=True
+        )
