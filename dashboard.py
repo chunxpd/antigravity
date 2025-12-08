@@ -10,7 +10,7 @@ import os
 st.set_page_config(layout="wide", page_title="이동평균선 돌파 종목 분석")
 
 # 제목
-st.title("📈 이동평균선 돌파 종목 분석")
+st.title("📈 이동평균선 돌파 종목 분석 made by Genius.")
 
 # 사이드바 설정
 st.sidebar.header("설정")
