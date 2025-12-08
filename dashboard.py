@@ -85,6 +85,69 @@ if st.sidebar.button("분석 시작 (데이터 갱신)"):
         except Exception as e:
             st.error(f"실행 중 오류 발생: {e}")
 
+st.sidebar.markdown("---")
+st.sidebar.header("과거 가격 비교 설정")
+compare_days = st.sidebar.number_input("과거 비교 기간 (일)", min_value=1, max_value=1000, value=5, help="N일 전 종가가 전일 종가보다 높은 종목을 찾습니다.")
+
+if st.sidebar.button("분석 시작 (가격 비교)"):
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    with st.spinner(f"{compare_days}일 전 종가와 비교 분석 중입니다..."):
+        try:
+            import sys
+            # MA 윈도우도 함께 전달하여 파일명이 일치하도록 함
+            cmd = [sys.executable, "stock_filter.py", "--window", str(window_size), "--compare-days", str(compare_days)]
+            if update_data:
+                cmd.append("--update")
+
+            # OS에 따른 인코딩 설정
+            encoding_type = 'cp949' if os.name == 'nt' else 'utf-8'
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding=encoding_type,
+                bufsize=1
+            )
+            
+            status_text.text("데이터 준비 및 분석 중...")
+            
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    line = line.strip()
+                    if line.startswith("PROGRESS:"):
+                        try:
+                            parts = line.split(":")[1].split("/")
+                            current = int(parts[0])
+                            total = int(parts[1])
+                            progress_bar.progress(current / total)
+                            status_text.text(f"진행 중: {current}/{total}")
+                        except:
+                            pass
+                    elif "KRX" in line:
+                         status_text.text(line)
+
+            return_code = process.poll()
+            
+            if return_code == 0:
+                progress_bar.progress(1.0)
+                status_text.text("분석 완료!")
+                st.success("가격 비교 분석이 완료되었습니다!")
+                # 결과 파일이 덮어씌워졌으므로 페이지 리로드 효과를 위해 rerun (또는 아래에서 로드)
+                st.rerun()
+            else:
+                stderr = process.stderr.read()
+                st.error(f"오류가 발생했습니다:\n{stderr}")
+                
+        except Exception as e:
+            st.error(f"실행 중 오류 발생: {e}")
+
 # 데이터 파일명 (window size에 따라 다름)
 csv_file = f'stocks_above_{window_size}ma.csv'
 
@@ -209,20 +272,25 @@ else:
         st.subheader("전체 필터링 결과")
         
         # 정수형으로 변환 (원화 표기 위해 소수점 제거)
-        numeric_cols = ['Close', f'MA{window_size}', 'Prev_Close', f'Prev_MA{window_size}']
+        numeric_cols = ['Close', f'MA{window_size}', 'Prev_Close', f'Prev_MA{window_size}', 'Compare_Price']
         for col in numeric_cols:
             if col in df_stocks.columns:
                 df_stocks[col] = df_stocks[col].fillna(0).round(0).astype('int64')
 
         # 숫자 포맷 설정
+        column_config = {
+            "Close": st.column_config.NumberColumn("Close", format="localized"),
+            f"MA{window_size}": st.column_config.NumberColumn(f"MA{window_size}", format="localized"),
+            "Prev_Close": st.column_config.NumberColumn("Prev_Close", format="localized"),
+            f"Prev_MA{window_size}": st.column_config.NumberColumn(f"Prev_MA{window_size}", format="localized"),
+            "Ratio": st.column_config.NumberColumn("Ratio", format="%.2f%%"),
+        }
+        
+        if 'Compare_Price' in df_stocks.columns:
+            column_config['Compare_Price'] = st.column_config.NumberColumn(f"{compare_days}일 전 종가", format="localized")
+
         st.dataframe(
             df_stocks,
-            column_config={
-                "Close": st.column_config.NumberColumn("Close", format="localized"),
-                f"MA{window_size}": st.column_config.NumberColumn(f"MA{window_size}", format="localized"),
-                "Prev_Close": st.column_config.NumberColumn("Prev_Close", format="localized"),
-                f"Prev_MA{window_size}": st.column_config.NumberColumn(f"Prev_MA{window_size}", format="localized"),
-                "Ratio": st.column_config.NumberColumn("Ratio", format="%.2f%%"),
-            },
+            column_config=column_config,
             hide_index=True
         )

@@ -130,14 +130,16 @@ def get_stock_data(ticker, name, start_date, update=False):
         except:
             return pd.DataFrame()
 
-def process_stock(row, window, update):
+def process_stock(row, window, update, compare_days=None):
     """개별 종목 처리 함수 (병렬 실행용)"""
     ticker = row['Code']
     name = row['Name']
     
     try:
         # 이동평균 계산을 위해 충분한 데이터(약 2년 + 여유)를 가져옵니다.
-        start_date = (datetime.datetime.now() - datetime.timedelta(days=window*2 + 365)).strftime('%Y-%m-%d')
+        # 비교 기간이 있으면 그만큼 더 필요할 수 있음
+        needed_days = max(window, compare_days if compare_days else 0)
+        start_date = (datetime.datetime.now() - datetime.timedelta(days=needed_days*2 + 365)).strftime('%Y-%m-%d')
         
         # 캐싱된 데이터 가져오기 함수 사용
         df = get_stock_data(ticker, name, start_date, update=update)
@@ -161,25 +163,60 @@ def process_stock(row, window, update):
         prev_close = prev['Close']
         prev_ma = prev[ma_col]
         
-        # 크로스오버 확인: 전일 종가 <= 전일 MA  AND  금일 종가 > 금일 MA
+
+        
+        # 가격 비교 필터 (이동평균 필터와 별개로 동작하거나 함께 동작)
+        # 여기서는 이동평균 조건이 만족되지 않아도, 가격 비교 조건이 있으면 체크하도록 로직을 수정해야 함
+        # 하지만 사용자가 "이평선 말고"라고 했으므로, 이평선 조건은 무시하고 가격 비교만 할 수도 있어야 함.
+        # 구조상 MA 필터가 메인이므로, compare_days가 설정되면 MA 조건 대신(혹은 추가로) 이걸 체크하는 식으로 변경
+        
+        result = {}
+        ma_condition = False
+        
+        # MA 조건 체크
         if (pd.notna(latest_ma) and pd.notna(prev_ma) and
             prev_close <= prev_ma and latest_close > latest_ma):
+            ma_condition = True
             
-            return {
+        compare_condition = False
+        compare_price = 0
+        
+        if compare_days:
+            # 데이터 충분한지 확인
+            if len(df) >= compare_days + 2:
+                # N일 전 종가 (T-N)
+                # iloc[-1]이 오늘, iloc[-2]가 어제(T-1)
+                # T-N은 iloc[-(N+1)]
+                past_data = df.iloc[-(compare_days + 1)]
+                past_close = past_data['Close']
+                compare_price = past_close
+                
+                # 조건: N일 전 종가 > 전날 종가
+                if past_close > prev_close:
+                    compare_condition = True
+        
+        # 결과 반환 로직
+        # 1. compare_days가 없으면 기존 MA 조건만 본다.
+        # 2. compare_days가 있으면 MA 조건 무시하고(또는 AND/OR?) 사용자의 요청은 "이평선 말고" 였으므로
+        #    compare_days가 있으면 그것만 만족해도 리턴하도록 함.
+        
+        if (compare_days and compare_condition) or (not compare_days and ma_condition):
+             return {
                 'Code': ticker,
                 'Name': name,
                 'Close': latest_close,
-                f'MA{window}': round(latest_ma, 2),
+                f'MA{window}': round(latest_ma, 2) if pd.notna(latest_ma) else 0,
                 'Prev_Close': prev_close,
-                f'Prev_MA{window}': round(prev_ma, 2),
-                'Ratio': round((latest_close / latest_ma - 1) * 100, 2)
+                f'Prev_MA{window}': round(prev_ma, 2) if pd.notna(prev_ma) else 0,
+                'Ratio': round((latest_close / latest_ma - 1) * 100, 2) if pd.notna(latest_ma) and latest_ma != 0 else 0,
+                'Compare_Price': compare_price if compare_days else 0
             }
             
     except Exception as e:
         return None
     return None
 
-def calculate_ma_and_filter(stocks, window=300, limit=None, update=False):
+def calculate_ma_and_filter(stocks, window=300, limit=None, update=False, compare_days=None):
     """
     병렬 처리를 이용하여 주가 데이터를 가져오고 필터링합니다.
     """
@@ -197,7 +234,7 @@ def calculate_ma_and_filter(stocks, window=300, limit=None, update=False):
     # 다만 너무 많은 프로세스 생성 부하를 줄이기 위해 workers 수를 조절
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         # 각 종목에 대해 process_stock 함수 실행 예약
-        future_to_stock = {executor.submit(process_stock, row, window, update): row['Code'] for _, row in stocks.iterrows()}
+        future_to_stock = {executor.submit(process_stock, row, window, update, compare_days): row['Code'] for _, row in stocks.iterrows()}
         
         completed_count = 0
         for future in concurrent.futures.as_completed(future_to_stock):
@@ -224,6 +261,7 @@ def main():
     parser.add_argument('--limit', type=int, help="분석할 종목 수 제한 (테스트용)")
     parser.add_argument('--output', type=str, help="결과를 저장할 CSV 파일명 (미지정 시 자동 생성)")
     parser.add_argument('--update', action='store_true', help="기존 데이터가 있어도 최신 데이터로 업데이트 시도")
+    parser.add_argument('--compare-days', type=int, help="N일 전 종가와 비교하여 필터링 (N일 전 종가 > 전일 종가)")
     args = parser.parse_args()
 
     window = args.window
@@ -232,11 +270,14 @@ def main():
     stocks = get_krx_stocks()
     
     # update 인자 전달
-    filtered_stocks = calculate_ma_and_filter(stocks, window=window, limit=args.limit, update=args.update)
+    filtered_stocks = calculate_ma_and_filter(stocks, window=window, limit=args.limit, update=args.update, compare_days=args.compare_days)
     
     if filtered_stocks:
         df_result = pd.DataFrame(filtered_stocks)
-        df_result = df_result[['Code', 'Name', 'Close', f'MA{window}', 'Ratio', 'Prev_Close', f'Prev_MA{window}']]
+        cols = ['Code', 'Name', 'Close', f'MA{window}', 'Ratio', 'Prev_Close', f'Prev_MA{window}']
+        if args.compare_days:
+            cols.append('Compare_Price')
+        df_result = df_result[cols]
         df_result.to_csv(output_file, index=False, encoding='utf-8-sig')
         print(f"\n분석 완료! 결과가 '{output_file}'에 저장되었습니다. (총 {len(df_result)}개 종목)")
         print(df_result.head())
