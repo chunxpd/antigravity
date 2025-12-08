@@ -208,6 +208,12 @@ else:
         # 데이터 테이블 표시
         st.subheader("전체 필터링 결과")
         
+        # 정수형으로 변환 (원화 표기 위해 소수점 제거)
+        numeric_cols = ['Close', f'MA{window_size}', 'Prev_Close', f'Prev_MA{window_size}']
+        for col in numeric_cols:
+            if col in df_stocks.columns:
+                df_stocks[col] = df_stocks[col].fillna(0).round(0).astype('int64')
+
         # 숫자 포맷 설정
         st.dataframe(
             df_stocks,
