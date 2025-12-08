@@ -95,6 +95,19 @@ def get_stock_data(ticker, name, start_date, update=False):
             # 로컬 파일 로드
             df = pd.read_csv(file_path, parse_dates=['Date'], index_col='Date')
             
+            # 데이터 시작일 확인 (요청한 start_date보다 데이터가 늦게 시작하면, 과거 데이터가 부족한 것임)
+            # 여유를 조금 두기 위해 30일 정도 차이는 허용 (휴장일 등 고려)
+            req_start = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+            if df.index[0] > req_start + datetime.timedelta(days=30):
+                # 과거 데이터 부족 -> 새로 다운로드
+                df = fetch_data_with_timeout(ticker, start_date, timeout=30)
+                if not df.empty:
+                    try:
+                        df.to_csv(file_path)
+                    except:
+                        pass
+                return df
+
             if update:
                 # 마지막 날짜 확인 후 업데이트
                 last_date = df.index[-1]
