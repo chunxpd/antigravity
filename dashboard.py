@@ -30,13 +30,16 @@ if st.sidebar.button("분석 시작 (데이터 갱신)"):
             if update_data:
                 cmd.append("--update")
 
+            # OS에 따른 인코딩 설정
+            encoding_type = 'cp949' if os.name == 'nt' else 'utf-8'
+
             # stock_filter.py 실행 (Popen으로 실시간 출력 캡처)
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                encoding='cp949', # 윈도우 한글 인코딩(CP949) 사용
+                encoding=encoding_type,
                 bufsize=1 # Line buffered
             )
             
