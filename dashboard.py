@@ -87,7 +87,7 @@ window_size = st.session_state.window_size
 update_data = st.sidebar.checkbox("최신 데이터 추가 다운로드 (오늘 날짜 반영)", value=False, help="평소에는 체크를 해제하세요! (매일 밤 자동으로 업데이트됩니다)\n장 마감 직후 등, 오늘 데이터를 즉시 반영해서 보고 싶을 때만 체크하세요.")
 
 # 분석 실행 버튼
-if st.sidebar.button("분석 시작 (데이터 갱신)"):
+if st.sidebar.button("분석 시작"):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
