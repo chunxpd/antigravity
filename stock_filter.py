@@ -116,7 +116,7 @@ def get_stock_data(ticker, name, start_date, update=False):
                     new_start = (last_date + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
                     try:
                         # 타임아웃 적용
-                        new_df = fetch_data_with_timeout(ticker, new_start, timeout=5)
+                        new_df = fetch_data_with_timeout(ticker, new_start, timeout=30)
                         if not new_df.empty:
                             df = pd.concat([df, new_df])
                             df = df[~df.index.duplicated(keep='last')] # 중복 제거

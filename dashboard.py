@@ -12,6 +12,43 @@ st.set_page_config(layout="wide", page_title="이동평균선 돌파 종목 분�
 # 제목
 st.title("📈 이동평균선 돌파 종목 분석 made by Genius.")
 
+# --- 배경 스케줄러 설정 (서버 내장 실행) ---
+import threading
+import time
+import datetime
+import update_data  # 데이터 업데이트 모듈 임포트
+
+@st.cache_resource
+def start_background_scheduler():
+    def scheduler_loop():
+        print("[Scheduler] Background scheduler started.")
+        while True:
+            now = datetime.datetime.now()
+            # 다음 자정 시간 계산
+            next_run = datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time(0, 0))
+            seconds_until_run = (next_run - now).total_seconds()
+            
+            print(f"[Scheduler] Waiting {seconds_until_run/3600:.1f} hours for next update ({next_run})")
+            
+            # 자정까지 대기
+            time.sleep(seconds_until_run + 5) # 5초 여유
+            
+            print("[Scheduler] Starting daily update...")
+            try:
+                update_data.main()
+                print("[Scheduler] Daily update completed.")
+            except Exception as e:
+                print(f"[Scheduler] Update failed: {e}")
+
+    # 데몬 스레드로 실행 (메인 프로그램 종료 시 함께 종료)
+    thread = threading.Thread(target=scheduler_loop, daemon=True)
+    thread.start()
+    return thread
+
+# 앱 시작 시 스케줄러 가동 (한 번만 실행됨)
+start_background_scheduler()
+# ----------------------------------------
+
 # 사이드바 설정
 st.sidebar.header("설정")
 window_size = st.sidebar.number_input("이동평균선 기간 (일)", min_value=5, max_value=3000, value=300, step=10)
@@ -170,7 +207,7 @@ def sanitize_filename(name):
 
 # 주가 데이터 로드 함수
 @st.cache_data
-def load_stock_data(ticker, name, window):
+def load_stock_data(ticker, name, window, last_modified=None):
     # 로컬 캐시 확인 ({ticker}_{name}.csv)
     safe_name = sanitize_filename(name)
     file_name = f"{ticker}_{safe_name}.csv"
@@ -227,8 +264,19 @@ else:
         st.subheader(f"주가 및 {window_size}일 이동평균선 차트")
         
         with st.spinner('차트 데이터를 불러오는 중...'):
-            # 이름도 함께 전달
-            df_chart = load_stock_data(ticker, name, window_size)
+            # 파일 수정 시간 확인 (캐시 무효화용)
+            safe_name = sanitize_filename(name)
+            file_name = f"{ticker}_{safe_name}.csv"
+            cache_path = f'stock_data/{file_name}'
+            old_cache_path = f'stock_data/{ticker}.csv'
+            
+            mtime = 0
+            if os.path.exists(cache_path):
+                mtime = os.path.getmtime(cache_path)
+            elif os.path.exists(old_cache_path):
+                mtime = os.path.getmtime(old_cache_path)
+
+            df_chart = load_stock_data(ticker, name, window_size, mtime)
             
 
 
