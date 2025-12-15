@@ -51,8 +51,40 @@ start_background_scheduler()
 
 # 사이드바 설정
 st.sidebar.header("설정")
-window_size = st.sidebar.number_input("이동평균선 기간 (일)", min_value=5, max_value=3000, value=300, step=10)
-update_data = st.sidebar.checkbox("최신 데이터 채우기 (기존 데이터 활용)", value=False, help="체크하면 기존 파일에 없는 최신 날짜 데이터만 추가로 받아옵니다. (전체 다운로드보다 훨씬 빠름)")
+
+# 세션 상태 초기화
+if 'window_size' not in st.session_state:
+    st.session_state.window_size = 300
+
+def update_from_slider():
+    st.session_state.window_size = st.session_state.ma_slider
+
+def update_from_input():
+    st.session_state.window_size = st.session_state.ma_input
+
+# 입력 위젯 배치 (서로 동기화)
+col1, col2 = st.sidebar.columns([2, 1])
+with col1:
+    st.slider(
+        "기간 (슬라이더)", 
+        min_value=5, max_value=3000, 
+        step=10, 
+        key='ma_slider', 
+        value=st.session_state.window_size, 
+        on_change=update_from_slider
+    )
+with col2:
+    st.number_input(
+        "기간 (입력)", 
+        min_value=5, max_value=3000, 
+        step=10, 
+        key='ma_input', 
+        value=st.session_state.window_size, 
+        on_change=update_from_input
+    )
+
+window_size = st.session_state.window_size
+update_data = st.sidebar.checkbox("최신 데이터 추가 다운로드 (오늘 날짜 반영)", value=False, help="평소에는 체크를 해제하세요! (매일 밤 자동으로 업데이트됩니다)\n장 마감 직후 등, 오늘 데이터를 즉시 반영해서 보고 싶을 때만 체크하세요.")
 
 # 분석 실행 버튼
 if st.sidebar.button("분석 시작 (데이터 갱신)"):
