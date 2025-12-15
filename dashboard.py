@@ -84,7 +84,7 @@ with col2:
     )
 
 window_size = st.session_state.window_size
-update_data = st.sidebar.checkbox("최신 데이터 추가 다운로드 (오늘 날짜 반영)", value=False, help="평소에는 체크를 해제하세요! (매일 밤 자동으로 업데이트됩니다)\n장 마감 직후 등, 오늘 데이터를 즉시 반영해서 보고 싶을 때만 체크하세요.")
+should_update = st.sidebar.checkbox("최신 데이터 추가 다운로드 (오늘 날짜 반영)", value=False, help="평소에는 체크를 해제하세요! (매일 밤 자동으로 업데이트됩니다)\n장 마감 직후 등, 오늘 데이터를 즉시 반영해서 보고 싶을 때만 체크하세요.")
 
 # 분석 실행 버튼
 if st.sidebar.button("분석 시작"):
@@ -96,7 +96,7 @@ if st.sidebar.button("분석 시작"):
             # 명령어 구성
             import sys
             cmd = [sys.executable, "stock_filter.py", "--window", str(window_size)]
-            if update_data:
+            if should_update:
                 cmd.append("--update")
 
             # OS에 따른 인코딩 설정
@@ -167,7 +167,7 @@ if st.sidebar.button("분석 시작 (가격 비교)"):
             import sys
             # MA 윈도우도 함께 전달하여 파일명이 일치하도록 함
             cmd = [sys.executable, "stock_filter.py", "--window", str(window_size), "--compare-days", str(compare_days)]
-            if update_data:
+            if should_update:
                 cmd.append("--update")
 
             # OS에 따른 인코딩 설정
