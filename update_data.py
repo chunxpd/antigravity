@@ -20,10 +20,34 @@ def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-def fetch_data(ticker, start_date):
+import multiprocessing
+
+def fetch_worker(ticker, start_date, queue):
+    """별도 프로세스에서 실행될 데이터 수집 함수"""
     try:
-        return fdr.DataReader(ticker, start=start_date)
-    except Exception as e:
+        df = fdr.DataReader(ticker, start=start_date)
+        queue.put(df)
+    except Exception:
+        queue.put(pd.DataFrame())
+
+def fetch_data(ticker, start_date, timeout=10):
+    """multiprocessing을 사용하여 타임아웃을 강제합니다."""
+    # Windows에서 multiprocessing 사용 시 freeze_support 필요 (main guard 내에서 호출됨)
+    queue = multiprocessing.Queue()
+    p = multiprocessing.Process(target=fetch_worker, args=(ticker, start_date, queue))
+    p.start()
+    
+    try:
+        df = queue.get(timeout=timeout)
+        p.join(timeout=1)
+        if p.is_alive():
+            p.terminate()
+            p.join()
+        return df
+    except Exception:
+        if p.is_alive():
+            p.terminate()
+            p.join()
         return pd.DataFrame()
 
 def process_stock(ticker, name):
@@ -51,7 +75,7 @@ def process_stock(ticker, name):
                 if last_date < today:
                     # 업데이트 필요
                     next_day = last_date + datetime.timedelta(days=1)
-                    new_df = fetch_data(ticker, next_day.strftime('%Y-%m-%d'))
+                    new_df = fetch_data(ticker, next_day.strftime('%Y-%m-%d'), timeout=10)
                     
                     if not new_df.empty:
                         df = pd.concat([df, new_df])
@@ -68,7 +92,7 @@ def process_stock(ticker, name):
 
         # 신규 다운로드 (또는 재다운로드)
         start_date = (datetime.datetime.now() - datetime.timedelta(days=DEFAULT_DAYS)).strftime('%Y-%m-%d')
-        df = fetch_data(ticker, start_date)
+        df = fetch_data(ticker, start_date, timeout=10)
         if not df.empty:
             df.to_csv(file_path)
             return f"Downloaded: {name} ({len(df)} rows)"
@@ -116,4 +140,5 @@ def main():
     print(f"[{datetime.datetime.now()}] Update finished.")
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

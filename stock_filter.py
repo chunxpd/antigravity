@@ -100,7 +100,7 @@ def get_stock_data(ticker, name, start_date, update=False):
             req_start = datetime.datetime.strptime(start_date, '%Y-%m-%d')
             if df.index[0] > req_start + datetime.timedelta(days=30):
                 # 과거 데이터 부족 -> 새로 다운로드
-                df = fetch_data_with_timeout(ticker, start_date, timeout=30)
+                df = fetch_data_with_timeout(ticker, start_date, timeout=10)
                 if not df.empty:
                     try:
                         df.to_csv(file_path)
@@ -126,7 +126,7 @@ def get_stock_data(ticker, name, start_date, update=False):
             return df
         else:
             # 신규 다운로드 (타임아웃 적용)
-            df = fetch_data_with_timeout(ticker, start_date, timeout=30)
+            df = fetch_data_with_timeout(ticker, start_date, timeout=10)
             if not df.empty:
                 try:
                     df.to_csv(file_path)
