@@ -147,6 +147,7 @@ if st.sidebar.button("분석 시작"):
                 progress_bar.progress(1.0)
                 status_text.text("분석 완료!")
                 st.success("분석이 완료되었습니다!")
+                st.session_state['run_backtest'] = True  # 자동으로 백테스팅 실행
             else:
                 stderr = process.stderr.read()
                 st.error(f"오류가 발생했습니다:\n{stderr}")
@@ -155,67 +156,15 @@ if st.sidebar.button("분석 시작"):
             st.error(f"실행 중 오류 발생: {e}")
 
 st.sidebar.markdown("---")
+st.sidebar.header(f"과거 패턴 분석 ({window_size}일 이평선 기준)")
+if st.sidebar.button("패턴 승률 분석 시작", help=f"현재 설정된 {window_size}일 이동평균선을 과거에 돌파했을 때, 이후 주가가 상승했는지 분석합니다."):
+    st.session_state['run_backtest'] = True
+
+st.sidebar.markdown("---")
 st.sidebar.header("과거 가격 비교 설정")
 compare_days = st.sidebar.number_input("과거 비교 기간 (일)", min_value=1, max_value=1000, value=5, help="N일 전 종가가 전일 종가보다 높은 종목을 찾습니다.")
 
-if st.sidebar.button("분석 시작 (가격 비교)"):
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    with st.spinner(f"{compare_days}일 전 종가와 비교 분석 중입니다..."):
-        try:
-            import sys
-            # MA 윈도우도 함께 전달하여 파일명이 일치하도록 함
-            cmd = [sys.executable, "stock_filter.py", "--window", str(window_size), "--compare-days", str(compare_days)]
-            if should_update:
-                cmd.append("--update")
-
-            # OS에 따른 인코딩 설정
-            encoding_type = 'cp949' if os.name == 'nt' else 'utf-8'
-
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding=encoding_type,
-                bufsize=1
-            )
-            
-            status_text.text("데이터 준비 및 분석 중...")
-            
-            while True:
-                line = process.stdout.readline()
-                if not line and process.poll() is not None:
-                    break
-                if line:
-                    line = line.strip()
-                    if line.startswith("PROGRESS:"):
-                        try:
-                            parts = line.split(":")[1].split("/")
-                            current = int(parts[0])
-                            total = int(parts[1])
-                            progress_bar.progress(current / total)
-                            status_text.text(f"진행 중: {current}/{total}")
-                        except:
-                            pass
-                    elif "KRX" in line:
-                         status_text.text(line)
-
-            return_code = process.poll()
-            
-            if return_code == 0:
-                progress_bar.progress(1.0)
-                status_text.text("분석 완료!")
-                st.success("가격 비교 분석이 완료되었습니다!")
-                # 결과 파일이 덮어씌워졌으므로 페이지 리로드 효과를 위해 rerun (또는 아래에서 로드)
-                st.rerun()
-            else:
-                stderr = process.stderr.read()
-                st.error(f"오류가 발생했습니다:\n{stderr}")
-                
-        except Exception as e:
-            st.error(f"실행 중 오류 발생: {e}")
+# ... (기존 코드) ... 
 
 # 데이터 파일명 (window size에 따라 다름)
 csv_file = f'stocks_above_{window_size}ma.csv'
@@ -391,3 +340,94 @@ else:
             column_config=column_config,
             hide_index=True
         )
+
+    # 백테스팅 실행 로직
+    if st.session_state.get('run_backtest', False):
+        st.markdown("---")
+        st.header(f"🔍 과거 패턴 승률 분석 (기준: {window_size}일 이동평균선 돌파)")
+        st.info(f"조건: {window_size}일 이동평균선을 어제 종가가 돌파했을 때, 이후 2주(10거래일) 내 10% 이상 상승한 확률")
+        
+        import backtest_logic
+        import importlib
+        importlib.reload(backtest_logic)
+        
+        results = []
+        progress_text = "이력 분석 중..."
+        my_bar = st.progress(0, text=progress_text)
+        
+        total_stocks = len(df_stocks)
+        
+        for i, row in df_stocks.iterrows():
+            ticker = row['Code']
+            name = row['Name']
+            
+            # 데이터 로드
+            safe_name = sanitize_filename(name)
+            file_name = f"{ticker}_{safe_name}.csv"
+            file_path = f'stock_data/{file_name}'
+            
+            if os.path.exists(file_path):
+                df_hist = pd.read_csv(file_path, parse_dates=['Date'], index_col='Date').sort_index()
+                
+                # 분석 실행 (MA 기준으로 변경)
+                # window_size 사용
+                res = backtest_logic.analyze_ma_breakout(df_hist, window=window_size, period_days=10, surge_threshold=0.10)
+                
+                if res:
+                    res['Code'] = ticker
+                    res['Name'] = name
+                    results.append(res)
+            
+            my_bar.progress((i + 1) / total_stocks, text=f"{name} 분석 중...")
+            
+        my_bar.empty()
+        st.session_state['run_backtest'] = False # 실행 후 초기화
+        
+        if results:
+            df_backtest = pd.DataFrame(results)
+            # 승률 순 정렬
+            df_backtest = df_backtest.sort_values(by=['success_rate', 'avg_max_return'], ascending=False)
+            
+            # 컬럼 순서 및 이름 변경
+            df_backtest = df_backtest[['Name', 'Code', 'success_rate', 'success_count', 'total_signals', 'avg_max_return']]
+            df_backtest.columns = ['종목명', '코드', '승률 (%)', '성공 횟수', '총 신호 발생', '평균 최대 수익률 (%)']
+            
+            # 결과 세션에 저장
+            st.session_state['backtest_results'] = df_backtest
+            st.rerun() # 화면 갱신을 위해 리런
+            
+        else:
+            st.warning("분석 가능한 데이터가 없습니다.")
+
+    # 저장된 백테스팅 결과 표시 logic
+    if 'backtest_results' in st.session_state and not st.session_state['backtest_results'].empty:
+        st.markdown("---")
+        st.header(f"🔍 과거 패턴 승률 분석 결과 (기준: {window_size}일 이동평균선 돌파)")
+        
+        df_backtest = st.session_state['backtest_results']
+        
+        st.write(f"총 {len(df_backtest)}개 종목 분석 완료")
+        st.dataframe(
+            df_backtest,
+            hide_index=True,
+            column_config={
+                "승률 (%)": st.column_config.ProgressColumn(
+                    "승률 (%)",
+                    format="%.1f%%",
+                    min_value=0,
+                    max_value=100,
+                ),
+                "평균 최대 수익률 (%)": st.column_config.NumberColumn(
+                    "평균 최대 수익률 (%)",
+                    format="%.1f%%"
+                )
+            }
+        )
+        
+        # 추천 종목 (승률 70% 이상)
+        high_prob_stocks = df_backtest[df_backtest['승률 (%)'] >= 70]
+        if not high_prob_stocks.empty:
+            st.success(f"🌟 추천 종목 (승률 70% 이상): {', '.join(high_prob_stocks['종목명'].tolist())}")
+        else:
+            st.write("승률 70% 이상인 종목이 없습니다.")
+

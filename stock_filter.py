@@ -204,8 +204,8 @@ def process_stock(row, window, update, compare_days=None):
                 past_close = past_data['Close']
                 compare_price = past_close
                 
-                # 조건: N일 전 종가 > 전날 종가
-                if past_close > prev_close:
+                # 조건: 전날 종가가 N일 전 종가를 돌파 (Prev_Close > Past_Close)
+                if prev_close > past_close:
                     compare_condition = True
         
         # 결과 반환 로직
