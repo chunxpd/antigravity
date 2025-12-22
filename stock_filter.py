@@ -9,7 +9,19 @@ import sys
 def get_krx_stocks():
     """KRX(코스피, 코스닥, 코넥스)에 상장된 모든 종목을 가져옵니다."""
     print("KRX 상장 종목을 가져오는 중...")
-    stocks = fdr.StockListing('KRX')
+    try:
+        stocks = fdr.StockListing('KRX')
+    except Exception as e:
+        print(f"KRX 전체 리스트 가져오기 실패 ({e}), KOSPI/KOSDAQ 개별 조회로 시도합니다...")
+        try:
+            kospi = fdr.StockListing('KOSPI')
+            kosdaq = fdr.StockListing('KOSDAQ')
+            stocks = pd.concat([kospi, kosdaq])
+        except Exception as e2:
+            print(f"개별 조회도 실패했습니다: {e2}")
+            # 최후의 수단: 빈 데이터프레임 또는 에러 재발생
+            raise e2
+            
     print(f"{len(stocks)}개의 종목을 찾았습니다.")
     return stocks
 
