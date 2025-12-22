@@ -19,8 +19,14 @@ def get_krx_stocks():
             stocks = pd.concat([kospi, kosdaq])
         except Exception as e2:
             print(f"개별 조회도 실패했습니다: {e2}")
-            # 최후의 수단: 빈 데이터프레임 또는 에러 재발생
-            raise e2
+            # 최후의 수단: 로컬 파일(krx_stocks.csv) 로드 시도
+            try:
+                print("로컬 'krx_stocks.csv' 파일에서 종목 리스트를 읽어옵니다...")
+                stocks = pd.read_csv('krx_stocks.csv', dtype={'Code': str}) # Code는 문자열로 읽어야 함 (005930 유지)
+                # fdr.StockListing 결과와 컬럼명을 맞춰주는 것이 좋음 (필요 시)
+            except Exception as e3:
+                print(f"로컬 파일 로드도 실패했습니다: {e3}")
+                raise e3
             
     print(f"{len(stocks)}개의 종목을 찾았습니다.")
     return stocks
